@@ -225,22 +225,86 @@ Java.perform(function() {
         return this.get.call(this, name);
     };
  
-    Interceptor.attach(Module.findExportByName("libc.so", "fopen"), {
+    // Hook for native `open` function
+    Interceptor.attach(Module.findExportByName("libc.so", "open"), {
         onEnter: function(args) {
-            var path1 = Memory.readCString(args[0]);
-            var path = path1.split("/");
-            var executable = path[path.length - 1];
-            var shouldFakeReturn = (RootBinaries.indexOf(executable) > -1)
-            if (shouldFakeReturn) {
-                Memory.writeUtf8String(args[0], "/ggezxxx");
-                send("Bypass native fopen >> "+path1);
+            var path = Memory.readCString(args[0]);
+            if (path) {
+                var shouldFakeReturn = RootBinaries.some(function(binary) {
+                    return path.endsWith("/" + binary);
+                });
+                if (shouldFakeReturn) {
+                    send("Bypass native open check for: " + path);
+                    this.shouldFakeReturn = true;
+                }
             }
         },
         onLeave: function(retval) {
- 
+            if (this.shouldFakeReturn) {
+                retval.replace(-1); // Simulate file not found
+            }
         }
     });
  
+    // Hook for `stat` function to simulate file absence
+    Interceptor.attach(Module.findExportByName("libc.so", "stat"), {
+        onEnter: function(args) {
+            var path = Memory.readCString(args[0]);
+            if (path) {
+                var shouldFakeReturn = RootBinaries.some(function(binary) {
+                    return path.endsWith("/" + binary);
+                });
+                if (shouldFakeReturn) {
+                    send("Bypass native stat check for: " + path);
+                    this.shouldFakeReturn = true;
+                }
+            }
+        },
+        onLeave: function(retval) {
+            if (this.shouldFakeReturn) {
+                retval.replace(-1); // Simulate file not found
+            }
+        }
+    });
+ 
+    // Hook for `access` function to simulate file absence
+    Interceptor.attach(Module.findExportByName("libc.so", "access"), {
+        onEnter: function(args) {
+            var path = Memory.readCString(args[0]);
+            if (path) {
+                var shouldFakeReturn = RootBinaries.some(function(binary) {
+                    return path.endsWith("/" + binary);
+                });
+                if (shouldFakeReturn) {
+                    send("Bypass native access check for: " + path);
+                    this.shouldFakeReturn = true;
+                }
+            }
+        },
+        onLeave: function(retval) {
+            if (this.shouldFakeReturn) {
+                retval.replace(-1); // Simulate file not found
+            }
+        }
+    });
+ 
+    // Hook for `fopen` function to simulate file absence
+    Interceptor.attach(Module.findExportByName("libc.so", "fopen"), {
+        onEnter: function(args) {
+            var path = Memory.readCString(args[0]);
+            if (path) {
+                var shouldFakeReturn = RootBinaries.some(function(binary) {
+                    return path.endsWith("/" + binary);
+                });
+                if (shouldFakeReturn) {
+                    send("Bypass native fopen check for: " + path);
+                    Memory.writeUtf8String(args[0], "/nonexistent");
+                }
+            }
+        }
+    });
+ 
+    // Hook for `system` function to bypass commands
     Interceptor.attach(Module.findExportByName("libc.so", "system"), {
         onEnter: function(args) {
             var cmd = Memory.readCString(args[0]);
@@ -253,23 +317,15 @@ Java.perform(function() {
                 send("Bypass native system: " + cmd);
                 Memory.writeUtf8String(args[0], "justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled");
             }
-        },
-        onLeave: function(retval) {
- 
         }
     });
-
  
+    // Hook for `readLine` to bypass build.prop checks
     BufferedReader.readLine.overload().implementation = function() {
         var text = this.readLine.call(this);
-        if (text === null) {
-            // just pass , i know it's ugly as hell but test != null won't work :(
-        } else {
-            var shouldFakeRead = (text.indexOf("ro.build.tags=test-keys") > -1);
-            if (shouldFakeRead) {
-                send("Bypass build.prop file read");
-                text = text.replace("ro.build.tags=test-keys", "ro.build.tags=release-keys");
-            }
+        if (text !== null && text.indexOf("ro.build.tags=test-keys") > -1) {
+            send("Bypass build.prop file read");
+            text = text.replace("ro.build.tags=test-keys", "ro.build.tags=release-keys");
         }
         return text;
     };
