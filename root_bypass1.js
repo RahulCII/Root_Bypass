@@ -1,16 +1,18 @@
 Java.perform(function() {
+    try {
+        var array_list = Java.use("java.util.ArrayList");
+        var ApiClient = Java.use('com.android.org.conscrypt.TrustManagerImpl');
  
-    var array_list = Java.use("java.util.ArrayList");
-    var ApiClient = Java.use('com.android.org.conscrypt.TrustManagerImpl');
+        ApiClient.checkTrustedRecursive.implementation = function(a1, a2, a3, a4, a5, a6) {
+            // console.log('Bypassing SSL Pinning');
+            var k = array_list.$new();
+            return k;
+        }
  
-    ApiClient.checkTrustedRecursive.implementation = function(a1, a2, a3, a4, a5, a6) {
-        // console.log('Bypassing SSL Pinning');
-        var k = array_list.$new();
-        return k;
+    } catch (err) {
+        send("Error in root_bypass.js: " + err);
     }
- 
-}, 0);
- 
+});
  
 Java.perform(function() {
  
@@ -305,35 +307,45 @@ Java.perform(function() {
                 var ProcManExecVariant = ProcessManager.exec.overload('[Ljava.lang.String;', '[Ljava.lang.String;', 'java.lang.String', 'java.io.FileDescriptor', 'java.io.FileDescriptor', 'java.io.FileDescriptor', 'boolean');
 
                 ProcManExec.implementation = function(cmd, env, workdir, redirectstderr) {
-                    var fake_cmd = cmd;
-                    for (var i = 0; i < cmd.length; i++) {
-                        var tmp_cmd = cmd[i];
-                        if (tmp_cmd.indexOf("getprop") != -1 || tmp_cmd == "mount" || tmp_cmd.indexOf("build.prop") != -1 || tmp_cmd == "id") {
-                            fake_cmd = ["grep"];
-                            send("Bypass " + cmd + " command");
+                    try {
+                        var fake_cmd = cmd;
+                        for (var i = 0; i < cmd.length; i++) {
+                            var tmp_cmd = cmd[i];
+                            if (tmp_cmd.indexOf("getprop") != -1 || tmp_cmd == "mount" || tmp_cmd.indexOf("build.prop") != -1 || tmp_cmd == "id") {
+                                fake_cmd = ["grep"];
+                                send("Bypass " + cmd + " command");
+                            }
+                            if (tmp_cmd == "su") {
+                                fake_cmd = ["justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled"];
+                                send("Bypass " + cmd + " command");
+                            }
                         }
-                        if (tmp_cmd == "su") {
-                            fake_cmd = ["justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled"];
-                            send("Bypass " + cmd + " command");
-                        }
+                        return ProcManExec.call(this, fake_cmd, env, workdir, redirectstderr);
+                    } catch (err) {
+                        send("Error in ProcManExec implementation: " + err);
+                        return ProcManExec.call(this, cmd, env, workdir, redirectstderr);
                     }
-                    return ProcManExec.call(this, fake_cmd, env, workdir, redirectstderr);
                 };
 
                 ProcManExecVariant.implementation = function(cmd, env, directory, stdin, stdout, stderr, redirect) {
-                    var fake_cmd = cmd;
-                    for (var i = 0; i < cmd.length; i++) {
-                        var tmp_cmd = cmd[i];
-                        if (tmp_cmd.indexOf("getprop") != -1 || tmp_cmd == "mount" || tmp_cmd.indexOf("build.prop") != -1 || tmp_cmd == "id") {
-                            fake_cmd = ["grep"];
-                            send("Bypass " + cmd + " command");
+                    try {
+                        var fake_cmd = cmd;
+                        for (var i = 0; i < cmd.length; i++) {
+                            var tmp_cmd = cmd[i];
+                            if (tmp_cmd.indexOf("getprop") != -1 || tmp_cmd == "mount" || tmp_cmd.indexOf("build.prop") != -1 || tmp_cmd == "id") {
+                                fake_cmd = ["grep"];
+                                send("Bypass " + cmd + " command");
+                            }
+                            if (tmp_cmd == "su") {
+                                fake_cmd = ["justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled"];
+                                send("Bypass " + cmd + " command");
+                            }
                         }
-                        if (tmp_cmd == "su") {
-                            fake_cmd = ["justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled"];
-                            send("Bypass " + cmd + " command");
-                        }
+                        return ProcManExecVariant.call(this, fake_cmd, env, directory, stdin, stdout, stderr, redirect);
+                    } catch (err) {
+                        send("Error in ProcManExecVariant implementation: " + err);
+                        return ProcManExecVariant.call(this, cmd, env, directory, stdin, stdout, stderr, redirect);
                     }
-                    return ProcManExecVariant.call(this, fake_cmd, env, directory, stdin, stdout, stderr, redirect);
                 };
             } else {
                 send("ProcessManager.exec not available");
@@ -348,8 +360,13 @@ Java.perform(function() {
             var KeyInfo = Java.use('android.security.keystore.KeyInfo');
             if (KeyInfo && KeyInfo.isInsideSecureHardware) {
                 KeyInfo.isInsideSecureHardware.implementation = function() {
-                    send("Bypass isInsideSecureHardware");
-                    return true;
+                    try {
+                        send("Bypass isInsideSecureHardware");
+                        return true;
+                    } catch (err) {
+                        send("Error in KeyInfo.isInsideSecureHardware implementation: " + err);
+                        return this.isInsideSecureHardware.call(this);
+                    }
                 };
             } else {
                 send("KeyInfo.isInsideSecureHardware not available");
@@ -405,4 +422,3 @@ setTimeout(function () {
         }
     });
 }, 1000)
-//rahul
