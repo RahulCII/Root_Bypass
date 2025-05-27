@@ -308,48 +308,56 @@ Java.perform(function() {
     };
  
     if (useProcessManager) {
-        var ProcManExec = ProcessManager.exec.overload('[Ljava.lang.String;', '[Ljava.lang.String;', 'java.io.File', 'boolean');
-        var ProcManExecVariant = ProcessManager.exec.overload('[Ljava.lang.String;', '[Ljava.lang.String;', 'java.lang.String', 'java.io.FileDescriptor', 'java.io.FileDescriptor', 'java.io.FileDescriptor', 'boolean');
+        try {
+            var ProcessManager = Java.use('java.lang.ProcessManager');
+            var ProcManExec = ProcessManager.exec.overload('[Ljava.lang.String;', '[Ljava.lang.String;', 'java.io.File', 'boolean');
+            var ProcManExecVariant = ProcessManager.exec.overload('[Ljava.lang.String;', '[Ljava.lang.String;', 'java.lang.String', 'java.io.FileDescriptor', 'java.io.FileDescriptor', 'java.io.FileDescriptor', 'boolean');
  
-        ProcManExec.implementation = function(cmd, env, workdir, redirectstderr) {
-            var fake_cmd = cmd;
-            for (var i = 0; i < cmd.length; i = i + 1) {
-                var tmp_cmd = cmd[i];
-                if (tmp_cmd.indexOf("getprop") != -1 || tmp_cmd == "mount" || tmp_cmd.indexOf("build.prop") != -1 || tmp_cmd == "id") {
-                    var fake_cmd = ["grep"];
-                    send("Bypass " + cmdarr + " command");
+            ProcManExec.implementation = function(cmd, env, workdir, redirectstderr) {
+                var fake_cmd = cmd;
+                for (var i = 0; i < cmd.length; i++) {
+                    var tmp_cmd = cmd[i];
+                    if (tmp_cmd.indexOf("getprop") != -1 || tmp_cmd == "mount" || tmp_cmd.indexOf("build.prop") != -1 || tmp_cmd == "id") {
+                        fake_cmd = ["grep"];
+                        send("Bypass " + cmd + " command");
+                    }
+                    if (tmp_cmd == "su") {
+                        fake_cmd = ["justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled"];
+                        send("Bypass " + cmd + " command");
+                    }
                 }
+                return ProcManExec.call(this, fake_cmd, env, workdir, redirectstderr);
+            };
  
-                if (tmp_cmd == "su") {
-                    var fake_cmd = ["justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled"];
-                    send("Bypass " + cmdarr + " command");
+            ProcManExecVariant.implementation = function(cmd, env, directory, stdin, stdout, stderr, redirect) {
+                var fake_cmd = cmd;
+                for (var i = 0; i < cmd.length; i++) {
+                    var tmp_cmd = cmd[i];
+                    if (tmp_cmd.indexOf("getprop") != -1 || tmp_cmd == "mount" || tmp_cmd.indexOf("build.prop") != -1 || tmp_cmd == "id") {
+                        fake_cmd = ["grep"];
+                        send("Bypass " + cmd + " command");
+                    }
+                    if (tmp_cmd == "su") {
+                        fake_cmd = ["justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled"];
+                        send("Bypass " + cmd + " command");
+                    }
                 }
-            }
-            return ProcManExec.call(this, fake_cmd, env, workdir, redirectstderr);
-        };
- 
-        ProcManExecVariant.implementation = function(cmd, env, directory, stdin, stdout, stderr, redirect) {
-            var fake_cmd = cmd;
-            for (var i = 0; i < cmd.length; i = i + 1) {
-                var tmp_cmd = cmd[i];
-                if (tmp_cmd.indexOf("getprop") != -1 || tmp_cmd == "mount" || tmp_cmd.indexOf("build.prop") != -1 || tmp_cmd == "id") {
-                    var fake_cmd = ["grep"];
-                    send("Bypass " + cmdarr + " command");
-                }
- 
-                if (tmp_cmd == "su") {
-                    var fake_cmd = ["justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled"];
-                    send("Bypass " + cmdarr + " command");
-                }
-            }
-            return ProcManExecVariant.call(this, fake_cmd, env, directory, stdin, stdout, stderr, redirect);
-        };
+                return ProcManExecVariant.call(this, fake_cmd, env, directory, stdin, stdout, stderr, redirect);
+            };
+        } catch (err) {
+            send("ProcessManager Hook failed: " + err);
+        }
     }
  
     if (useKeyInfo) {
-        KeyInfo.isInsideSecureHardware.implementation = function() {
-            send("Bypass isInsideSecureHardware");
-            return true;
+        try {
+            var KeyInfo = Java.use('android.security.keystore.KeyInfo');
+            KeyInfo.isInsideSecureHardware.implementation = function() {
+                send("Bypass isInsideSecureHardware");
+                return true;
+            };
+        } catch (err) {
+            send("KeyInfo Hook failed: " + err);
         }
     }
  
