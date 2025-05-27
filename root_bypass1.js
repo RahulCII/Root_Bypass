@@ -478,3 +478,141 @@ setTimeout(function () {
         }
     });
 }, 1000)
+
+Java.perform(function() {
+    try {
+        // Hook for dynamic class/method enumeration
+        Java.enumerateLoadedClasses({
+            onMatch: function(className) {
+                if (className.toLowerCase().indexOf("root") !== -1 || className.toLowerCase().indexOf("debug") !== -1) {
+                    send("Potential Root/Debug Class: " + className);
+                }
+            },
+            onComplete: function() {
+                send("Class enumeration completed.");
+            }
+        });
+
+        // Hook for detecting native library loads
+        Interceptor.attach(Module.findExportByName(null, "dlopen"), {
+            onEnter: function(args) {
+                var libName = Memory.readCString(args[0]);
+                send("Native Library Loaded: " + libName);
+                if (libName.indexOf("root") !== -1 || libName.indexOf("debug") !== -1) {
+                    send("Potential Root/Debug Library: " + libName);
+                }
+            }
+        });
+
+        // Hook for detecting anti-debugging methods
+        var Debug = Java.use("android.os.Debug");
+        Debug.isDebuggerConnected.implementation = function() {
+            send("Bypass Debugger Check");
+            return false;
+        };
+
+        // Hook for detecting stack traces
+        var Throwable = Java.use("java.lang.Throwable");
+        Throwable.printStackTrace.implementation = function() {
+            send("Stack Trace Captured");
+            return this.printStackTrace.call(this);
+        };
+
+        // Hook for detecting runtime.exec calls
+        Runtime.exec.overload('java.lang.String').implementation = function(cmd) {
+            send("Runtime.exec called with command: " + cmd);
+            if (cmd.indexOf("getprop") !== -1 || cmd.indexOf("su") !== -1) {
+                send("Bypass Runtime.exec command: " + cmd);
+                return this.exec.call(this, "grep");
+            }
+            return this.exec.call(this, cmd);
+        };
+
+        // Hook for detecting system properties
+        SystemProperties.get.overload('java.lang.String').implementation = function(name) {
+            send("System Property Accessed: " + name);
+            if (RootPropertiesKeys.indexOf(name) !== -1) {
+                send("Bypass System Property: " + name);
+                return RootProperties[name];
+            }
+            return this.get.call(this, name);
+        };
+
+        // Hook for detecting file checks
+        NativeFile.exists.implementation = function() {
+            var path = this.getAbsolutePath.call(this);
+            send("File Check: " + path);
+            if (RootBinaries.indexOf(path) !== -1) {
+                send("Bypass File Check: " + path);
+                return false;
+            }
+            return this.exists.call(this);
+        };
+
+        // Hook for detecting fopen calls
+        Interceptor.attach(Module.findExportByName("libc.so", "fopen"), {
+            onEnter: function(args) {
+                var path = Memory.readCString(args[0]);
+                send("fopen called with path: " + path);
+                if (path.indexOf("su") !== -1 || path.indexOf("magisk") !== -1) {
+                    send("Bypass fopen for path: " + path);
+                    Memory.writeUtf8String(args[0], "/nonexistent");
+                }
+            }
+        });
+
+        // Hook for detecting system calls
+        Interceptor.attach(Module.findExportByName("libc.so", "system"), {
+            onEnter: function(args) {
+                var cmd = Memory.readCString(args[0]);
+                send("system called with command: " + cmd);
+                if (cmd.indexOf("getprop") !== -1 || cmd.indexOf("su") !== -1) {
+                    send("Bypass system command: " + cmd);
+                    Memory.writeUtf8String(args[0], "grep");
+                }
+            }
+        });
+
+        // Hook for detecting anti-debugging flags
+        var Build = Java.use("android.os.Build");
+        Build.TAGS.value = "release-keys";
+        send("Bypass Build Tags Check");
+
+        // Hook for detecting SELinux status
+        var SELinux = Java.use("android.os.SELinux");
+        SELinux.isSELinuxEnforced.implementation = function() {
+            send("Bypass SELinux Enforcement Check");
+            return false;
+        };
+
+        // Hook for detecting root package checks
+        PackageManager.getPackageInfo.overload('java.lang.String', 'int').implementation = function(pname, flags) {
+            send("Package Check: " + pname);
+            if (RootPackages.indexOf(pname) !== -1) {
+                send("Bypass Package Check: " + pname);
+                pname = "fake.package.name";
+            }
+            return this.getPackageInfo.call(this, pname, flags);
+        };
+
+        // Hook for detecting root binaries
+        Interceptor.attach(Module.findExportByName("libc.so", "access"), {
+            onEnter: function(args) {
+                var path = Memory.readCString(args[0]);
+                send("access called with path: " + path);
+                if (path.indexOf("su") !== -1 || path.indexOf("magisk") !== -1) {
+                    send("Bypass access for path: " + path);
+                    this.shouldFakeReturn = true;
+                }
+            },
+            onLeave: function(retval) {
+                if (this.shouldFakeReturn) {
+                    retval.replace(-1);
+                }
+            }
+        });
+
+    } catch (err) {
+        send("Error in root_bypass.js: " + err);
+    }
+});
