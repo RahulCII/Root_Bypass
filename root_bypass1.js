@@ -192,12 +192,12 @@ Java.perform(function() {
     };
  
     exec1.implementation = function(cmd) {
-        if (cmd.indexOf("getprop") != -1 || cmd == "mount" || cmd.indexOf("build.prop") != -1 || cmd == "id" || cmd == "sh") {
+        if (cmd.indexOf("getprop") != -1 || cmd == "mount" || cmd.indexOf("build.prop") != -1 || cmd == "id" || cmd == "sh" || cmd.indexOf("which") != -1) {
             var fakeCmd = "grep";
             send("Bypass " + cmd + " command");
             return exec1.call(this, fakeCmd);
         }
-        if (cmd == "su") {
+        if (cmd == "su" || cmd.indexOf("magisk") != -1) {
             var fakeCmd = "justafakecommandthatcannotexistsusingthisshouldthowanexceptionwheneversuiscalled";
             send("Bypass " + cmd + " command");
             return exec1.call(this, fakeCmd);
@@ -217,7 +217,7 @@ Java.perform(function() {
  
     get.implementation = function(name) {
         if (RootPropertiesKeys.indexOf(name) != -1) {
-            send("Bypass " + name);
+            send("Bypass system property: " + name);
             return RootProperties[name];
         }
         return this.get.call(this, name);
