@@ -63,25 +63,15 @@ Java.perform(function() {
     send("loaded: " + loaded_classes.indexOf('java.lang.ProcessManager'));
  
     if (loaded_classes.indexOf('java.lang.ProcessManager') != -1) {
-        try {
-            //useProcessManager = true;
-            //var ProcessManager = Java.use('java.lang.ProcessManager');
-        } catch (err) {
-            send("ProcessManager Hook failed: " + err);
-        }
+        useProcessManager = true; // Enable ProcessManager hook
+        send("ProcessManager hook loaded");
     } else {
         send("ProcessManager hook not loaded");
     }
  
-    var KeyInfo = null;
- 
     if (loaded_classes.indexOf('android.security.keystore.KeyInfo') != -1) {
-        try {
-            //useKeyInfo = true;
-            //var KeyInfo = Java.use('android.security.keystore.KeyInfo');
-        } catch (err) {
-            send("KeyInfo Hook failed: " + err);
-        }
+        useKeyInfo = true; // Enable KeyInfo hook
+        send("KeyInfo hook loaded");
     } else {
         send("KeyInfo hook not loaded");
     }
